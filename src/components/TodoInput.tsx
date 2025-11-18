@@ -24,13 +24,7 @@ export default function TodoInput({ onAdd }: { onAdd: (text: string) => void }) 
       <button style={{ marginLeft: 8 }} onClick={submit}   id="add-todo-button">
         Add
       </button>
-        <button
-            style={{ marginLeft: 8 }}
-            onClick={clear}
-            id="clear-todo-button"
-        >
-            Clear
-        </button>
+   
     </div>
   );
 }
