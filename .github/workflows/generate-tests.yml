@@ -1,0 +1,47 @@
+name: Generate AI Tests on PR Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  generate-tests:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo A
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate AI test cases from PR diff
+        id: ai
+        run: |
+          echo "Generating AI tests..."
+          # Your AI call here (OpenAI / local model)
+          # Save all generated tests to ./generated-tests/
+          mkdir -p generated-tests
+          echo "// AI generated" > generated-tests/ai-test.spec.ts
+
+      - name: Checkout Repo B
+        run: |
+          git clone https://x-access-token:${{ secrets.REPO_B_TOKEN }}@github.com/sarang-code2/ai-playwright-tests.git repo-b
+
+      - name: Copy generated tests into Repo B
+        run: |
+          cp generated-tests/*.spec.ts repo-b/tests/ai-generated/
+
+      - name: Commit & push tests to Repo B
+        run: |
+          cd repo-b
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .
+          git commit -m "AI-generated tests for PR #${{ github.event.pull_request.number }}"
+          git push

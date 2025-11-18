@@ -12,6 +12,7 @@ export default function TodoItem({
 }) {
   return (
     <div
+      className="todo-item"
       style={{
         display: "flex",
         padding: "8px 0",
