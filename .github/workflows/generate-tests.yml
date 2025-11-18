@@ -44,7 +44,7 @@ jobs:
 
           async function run() {
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const model = genAI.getGenerativeModel({ model: "models/text-bison-001" });
 
             const prompt = `
           You generate Playwright test cases based ONLY on the diff.
