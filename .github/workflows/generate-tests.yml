@@ -23,7 +23,7 @@ jobs:
       - name: Install Dependencies
         run: |
           npm init -y
-          npm install openai@4.0.0
+          npm install axios
 
       - name: Extract PR Diff
         id: diff
@@ -33,44 +33,51 @@ jobs:
           git diff origin/main...HEAD > pr.diff
           echo "Diff created"
 
-      - name: Generate AI Tests via OpenAI
+      - name: Generate AI Tests via Grok (xAI)
         id: ai
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
         run: |
-          echo "Calling OpenAI to generate tests..."
+          echo "Calling Grok to generate tests..."
 
           NODE_CODE=$(cat << 'EOF'
           import fs from 'fs';
-          import OpenAI from 'openai';
-
-          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          import axios from 'axios';
 
           const diff = fs.readFileSync('pr.diff', 'utf8');
 
           async function run() {
-            console.log("Sending diff to OpenAI...");
+            console.log("Sending diff to Grok...");
 
-            const response = await client.chat.completions.create({
-              model: "gpt-4o-mini",
-              messages: [
-                {
-                  role: "system",
-                  content: "You generate Playwright test cases based on code changes."
-                },
-                {
-                  role: "user",
-                  content: `Here is the PR diff:\n\n${diff}\n\nGenerate Playwright tests in TypeScript.`
+            const response = await axios.post(
+              "https://api.x.ai/v1/chat/completions",
+              {
+                model: "grok-2-latest",
+                messages: [
+                  {
+                    role: "system",
+                    content: "You generate well-structured, stable Playwright test cases in TypeScript based on PR code diffs."
+                  },
+                  {
+                    role: "user",
+                    content: `Here is the PR diff:\n\n${diff}\n\nGenerate Playwright test files only. No explanation — only raw code output.`
+                  }
+                ]
+              },
+              {
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${process.env.GROK_API_KEY}`,
                 }
-              ]
-            });
+              }
+            );
 
-            const testContent = response.choices[0].message.content;
+            const testContent = response.data.choices[0].message.content;
 
             fs.mkdirSync("generated-tests", { recursive: true });
             fs.writeFileSync("generated-tests/ai-test.spec.ts", testContent);
 
-            console.log("AI test generated successfully.");
+            console.log("AI-generated Playwright test created successfully.");
           }
 
           run();
