@@ -14,7 +14,7 @@ export default function TodoInput({ onAdd }: { onAdd: (text: string) => void }) 
       <input
         style={{ flex: 1, padding: 8 }}
         value={text}
-        placeholder="Add a new todo item"
+        placeholder="Add a new todo"
         onChange={(e) => setText(e.target.value)}
         id="todo-input"
       />
