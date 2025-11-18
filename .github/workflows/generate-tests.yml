@@ -8,12 +8,10 @@ on:
 
 jobs:
   generate-tests:
-    # ❗ must be boolean, not string
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
-      # Repo A
       - name: Checkout Repo A
         uses: actions/checkout@v4
 
@@ -25,9 +23,8 @@ jobs:
       - name: Install Dependencies
         run: |
           npm init -y
-          npm install openai@4.0.0
+          npm install axios
 
-      # Extract PR Diff
       - name: Extract PR Diff
         id: diff
         run: |
@@ -36,46 +33,61 @@ jobs:
           git diff origin/main...HEAD > pr.diff
           echo "Diff created"
 
-      # Generate tests with OpenAI
-      - name: Generate AI Tests via OpenAI
+            - name: Generate AI Tests via Gemini
         id: ai
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          echo "Calling OpenAI to generate tests..."
+          echo "Calling Gemini to generate tests..."
 
-          cat << 'EOF' > generate.js
+          NODE_CODE=$(cat << 'EOF'
           import fs from 'fs';
-          import OpenAI from "openai";
+          import axios from 'axios';
 
-          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-          const diff = fs.readFileSync("pr.diff", "utf8");
+          const diff = fs.readFileSync('pr.diff', 'utf8');
 
           async function run() {
-            console.log("Sending diff to OpenAI...");
+            console.log("Sending diff to Gemini...");
 
-            const response = await client.chat.completions.create({
-              model: "gpt-4o-mini",
-              messages: [
-                { role: "system", content: "Generate Playwright test cases ONLY from the provided diff. Output ONLY .spec.ts code." },
-                { role: "user", content: `PR DIFF:\n\n${diff}` }
-              ]
-            });
+            const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-            const testContent = response.choices[0].message.content;
+            const response = await axios.post(
+              url,
+              {
+                contents: [
+                  {
+                    role: "user",
+                    parts: [
+                      {
+                        text: `Write Playwright test cases ONLY based on this PR diff.\nOutput only raw .spec.ts code.\n\nPR DIFF:\n${diff}`
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                headers: {
+                  "Content-Type": "application/json"
+                }
+              }
+            );
+
+            const testContent =
+              response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
+              "/* Gemini returned no content */";
 
             fs.mkdirSync("generated-tests", { recursive: true });
             fs.writeFileSync("generated-tests/ai-test.spec.ts", testContent);
 
-            console.log("AI test generated successfully.");
+            console.log("AI test generated successfully using Gemini.");
           }
 
           run();
           EOF
+          )
 
-          node generate.js
+          node -e "$NODE_CODE"
 
-      # Repo B checkout
       - name: Checkout Repo B
         run: |
           git clone https://x-access-token:${{ secrets.REPO_B_TOKEN }}@github.com/sarang-code2/ai-playwright-tests.git repo-b
