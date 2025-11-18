@@ -31,6 +31,13 @@ export default function TodoInput({ onAdd }: { onAdd: (text: string) => void }) 
         >
             Clear
         </button>
+         <button
+            style={{ marginLeft: 8 }}
+            onClick={clear}
+            id="clear-todo-button"
+        >
+            Clear1
+        </button>
     </div>
   );
 }
