@@ -31,54 +31,52 @@ jobs:
           git diff origin/main...HEAD > pr.diff
 
       - name: Generate AI Tests via Google Gemini
-  env:
-    GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-  run: |
-    echo "Creating JS generator..."
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          echo "Creating JS generator..."
 
-    # Print first 500 characters of the diff for logging
-    echo "PR Diff Preview:"
-    head -c 500 pr.diff || true
-    echo "----------------------"
+          # Print first 500 characters of the diff for logging
+          echo "PR Diff Preview:"
+          head -c 500 pr.diff || true
+          echo "----------------------"
 
-    cat << 'EOF' > generate.js
-    import fs from "fs";
-    import { GoogleGenerativeAI } from "@google/generative-ai";
+          cat << 'EOF' > generate.js
+          import fs from "fs";
+          import { GoogleGenerativeAI } from "@google/generative-ai";
 
-    const diff = fs.readFileSync("pr.diff", "utf8");
-    console.log("PR diff length:", diff.length); // Log diff length
+          const diff = fs.readFileSync("pr.diff", "utf8");
+          console.log("PR diff length:", diff.length); // Log diff length
 
-    async function run() {
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+          async function run() {
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-      // Use a valid model here
-      const model = genAI.getGenerativeModel({ model: "models/text-bison-001" });
+            // Use a valid model from your API key
+            const model = genAI.getGenerativeModel({ model: "models/text-bison-001" });
 
-      const prompt = `
-    You generate Playwright test cases based ONLY on the diff.
-    Output must be valid .spec.ts code.
-    PR DIFF:
-    ${diff}
-    `;
+            const prompt = `
+          You generate Playwright test cases based ONLY on the diff.
+          Output must be valid .spec.ts code.
+          PR DIFF:
+          ${diff}
+          `;
 
-      const result = await model.generateContent(prompt);
-      let testContent = result.response.text();
+            const result = await model.generateContent(prompt);
+            let testContent = result.response.text();
 
-      // Strip any ```typescript fences
-      testContent = testContent.replace(/^```(typescript)?\n/, "");
-      testContent = testContent.replace(/```$/, "");
+            // Strip any ```typescript fences
+            testContent = testContent.replace(/^```(typescript)?\n/, "");
+            testContent = testContent.replace(/```$/, "");
 
-      fs.mkdirSync("generated-tests", { recursive: true });
-      fs.writeFileSync("generated-tests/ai-test.spec.ts", testContent);
+            fs.mkdirSync("generated-tests", { recursive: true });
+            fs.writeFileSync("generated-tests/ai-test.spec.ts", testContent);
 
-      console.log("Generated Playwright test.");
-    }
+            console.log("Generated Playwright test.");
+          }
 
-    run();
-    EOF
-
-        node generate.js
-
+          run();
+          EOF
+          node generate.js
 
       - name: Checkout Repo B
         run: |
