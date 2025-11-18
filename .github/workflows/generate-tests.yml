@@ -37,33 +37,33 @@ jobs:
           echo "Creating JS generator..."
 
           cat << 'EOF' > generate.js
-import fs from "fs";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+          import fs from "fs";
+          import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const diff = fs.readFileSync("pr.diff", "utf8");
+          const diff = fs.readFileSync("pr.diff", "utf8");
 
-async function run() {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+          async function run() {
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-  const prompt = `
-You generate Playwright test cases based ONLY on the diff.
-Output must be valid .spec.ts code.
-PR DIFF:
-${diff}
-`;
+            const prompt = `
+          You generate Playwright test cases based ONLY on the diff.
+          Output must be valid .spec.ts code.
+          PR DIFF:
+          ${diff}
+          `;
 
-  const result = await model.generateContent(prompt);
-  const testContent = result.response.text();
+            const result = await model.generateContent(prompt);
+            const testContent = result.response.text();
 
-  fs.mkdirSync("generated-tests", { recursive: true });
-  fs.writeFileSync("generated-tests/ai-test.spec.ts", testContent);
+            fs.mkdirSync("generated-tests", { recursive: true });
+            fs.writeFileSync("generated-tests/ai-test.spec.ts", testContent);
 
-  console.log("Generated Playwright test.");
-}
+          console.log("Generated Playwright test.");
+          }
 
-run();
-EOF
+          run();
+          EOF
 
           node generate.js
 
