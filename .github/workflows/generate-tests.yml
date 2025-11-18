@@ -15,78 +15,48 @@ jobs:
       - name: Checkout Repo A
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Dependencies
+      - name: Install Ollama (free open-source LLM engine)
         run: |
-          npm init -y
-          npm install openai@4.0.0
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama --version
 
-      - name: Extract PR Diff
+      - name: Pull a free open-source LLM
+        run: |
+          ollama pull mistral  # or: phi3, llama3, codellama, etc.
+
+      - name: Extract PR diff
         id: diff
         run: |
-          echo "Generating PR diff..."
           git fetch origin main
           git diff origin/main...HEAD > pr.diff
-          echo "Diff created"
+          echo "PR diff extracted:"
+          cat pr.diff
 
-      - name: Generate AI Tests via OpenAI
+      - name: Generate tests using LLM
         id: ai
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          echo "Calling OpenAI to generate tests..."
+          mkdir -p generated-tests
+          
+          PROMPT=$(cat <<EOF
+Write Playwright test cases based ONLY on this PR diff:
 
-          NODE_CODE=$(cat << 'EOF'
-          import fs from 'fs';
-          import OpenAI from 'openai';
+$(cat pr.diff)
 
-          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-          const diff = fs.readFileSync('pr.diff', 'utf8');
-
-          async function run() {
-            console.log("Sending diff to OpenAI...");
-
-            const response = await client.chat.completions.create({
-              model: "gpt-4o-mini",
-              messages: [
-                {
-                  role: "system",
-                  content: "You generate Playwright test cases based on code changes."
-                },
-                {
-                  role: "user",
-                  content: `Here is the PR diff:\n\n${diff}\n\nGenerate Playwright tests in TypeScript.`
-                }
-              ]
-            });
-
-            const testContent = response.choices[0].message.content;
-
-            fs.mkdirSync("generated-tests", { recursive: true });
-            fs.writeFileSync("generated-tests/ai-test.spec.ts", testContent);
-
-            console.log("AI test generated successfully.");
-          }
-
-          run();
-          EOF
+Output ONLY valid .spec.ts code.
+EOF
           )
 
-          node -e "$NODE_CODE"
+          # Call open-source LLM via Ollama
+          ollama run mistral "$PROMPT" > generated-tests/ai-test.spec.ts
 
       - name: Checkout Repo B
         run: |
           git clone https://x-access-token:${{ secrets.REPO_B_TOKEN }}@github.com/sarang-code2/ai-playwright-tests.git repo-b
 
-      - name: Copy generated tests into Repo B
+      - name: Copy generated tests to Repo B
         run: |
-          mkdir -p repo-b/tests/ai-generated
-          cp generated-tests/*.ts repo-b/tests/ai-generated/
+          mkdir -p repo-b/tests/ai-generated/
+          cp generated-tests/*.spec.ts repo-b/tests/ai-generated/
 
       - name: Commit & push tests to Repo B
         run: |
