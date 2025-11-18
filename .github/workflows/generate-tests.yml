@@ -80,7 +80,7 @@ jobs:
 
       - name: Checkout Repo B
         run: |
-          git clone https://x-access-token:${{ secrets.REPO_B_TOKEN }}@github.com/sarang-code2/ai-playwright-tests.git repo-b
+          git clone https://x-access-token:${{ secrets.AI_TEST_REPO_TOKEN }}@github.com/sarang-code2/ai-playwright-tests.git repo-b
 
       - name: Copy generated tests into Repo B
         run: |
