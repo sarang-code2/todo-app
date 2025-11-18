@@ -15,39 +15,35 @@ jobs:
       - name: Checkout Repo A
         uses: actions/checkout@v4
 
-      - name: Install Ollama (free open-source LLM engine)
+      - name: Install Ollama
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
           ollama --version
 
-      - name: Pull a free open-source LLM
+      - name: Pull open-source LLM
         run: |
-          ollama pull mistral  # or: phi3, llama3, codellama, etc.
+          ollama pull mistral
 
       - name: Extract PR diff
-        id: diff
         run: |
           git fetch origin main
           git diff origin/main...HEAD > pr.diff
-          echo "PR diff extracted:"
-          cat pr.diff
 
-      - name: Generate tests using LLM
-        id: ai
+      - name: Prepare prompt
         run: |
           mkdir -p generated-tests
-          
-          PROMPT=$(cat <<EOF
-Write Playwright test cases based ONLY on this PR diff:
 
-$(cat pr.diff)
+          echo "Write Playwright test cases based ONLY on this PR diff." > prompt.txt
+          echo "Output ONLY valid .spec.ts file content." >> prompt.txt
+          echo "" >> prompt.txt
+          echo "PR DIFF BELOW:" >> prompt.txt
+          echo "" >> prompt.txt
 
-Output ONLY valid .spec.ts code.
-EOF
-          )
+          cat pr.diff >> prompt.txt
 
-          # Call open-source LLM via Ollama
-          ollama run mistral "$PROMPT" > generated-tests/ai-test.spec.ts
+      - name: Generate tests using LLM
+        run: |
+          cat prompt.txt | ollama run mistral > generated-tests/ai-test.spec.ts
 
       - name: Checkout Repo B
         run: |
@@ -64,5 +60,5 @@ EOF
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add .
-          git commit -m "AI-generated tests for PR #${{ github.event.pull_request.number }}" || echo "No changes to commit"
+          git commit -m "AI-generated tests for PR #${{ github.event.pull_request.number }}" || echo "No changes"
           git push
