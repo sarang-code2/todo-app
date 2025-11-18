@@ -23,70 +23,49 @@ jobs:
       - name: Install Dependencies
         run: |
           npm init -y
-          npm install axios
+          npm install @google/generative-ai
 
       - name: Extract PR Diff
-        id: diff
         run: |
-          echo "Generating PR diff..."
           git fetch origin main
           git diff origin/main...HEAD > pr.diff
-          echo "Diff created"
 
-            - name: Generate AI Tests via Gemini
-        id: ai
+      - name: Generate AI Tests via Google Gemini
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          echo "Calling Gemini to generate tests..."
+          echo "Creating JS generator..."
 
-          NODE_CODE=$(cat << 'EOF'
-          import fs from 'fs';
-          import axios from 'axios';
+          cat << 'EOF' > generate.js
+import fs from "fs";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-          const diff = fs.readFileSync('pr.diff', 'utf8');
+const diff = fs.readFileSync("pr.diff", "utf8");
 
-          async function run() {
-            console.log("Sending diff to Gemini...");
+async function run() {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-            const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+  const prompt = `
+You generate Playwright test cases based ONLY on the diff.
+Output must be valid .spec.ts code.
+PR DIFF:
+${diff}
+`;
 
-            const response = await axios.post(
-              url,
-              {
-                contents: [
-                  {
-                    role: "user",
-                    parts: [
-                      {
-                        text: `Write Playwright test cases ONLY based on this PR diff.\nOutput only raw .spec.ts code.\n\nPR DIFF:\n${diff}`
-                      }
-                    ]
-                  }
-                ]
-              },
-              {
-                headers: {
-                  "Content-Type": "application/json"
-                }
-              }
-            );
+  const result = await model.generateContent(prompt);
+  const testContent = result.response.text();
 
-            const testContent =
-              response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
-              "/* Gemini returned no content */";
+  fs.mkdirSync("generated-tests", { recursive: true });
+  fs.writeFileSync("generated-tests/ai-test.spec.ts", testContent);
 
-            fs.mkdirSync("generated-tests", { recursive: true });
-            fs.writeFileSync("generated-tests/ai-test.spec.ts", testContent);
+  console.log("Generated Playwright test.");
+}
 
-            console.log("AI test generated successfully using Gemini.");
-          }
+run();
+EOF
 
-          run();
-          EOF
-          )
-
-          node -e "$NODE_CODE"
+          node generate.js
 
       - name: Checkout Repo B
         run: |
@@ -103,5 +82,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add .
-          git commit -m "AI-generated tests for PR #${{ github.event.pull_request.number }}" || echo "No changes to commit"
+          git commit -m "AI-generated tests for PR #${{ github.event.pull_request.number }}" || echo "No changes."
           git push
