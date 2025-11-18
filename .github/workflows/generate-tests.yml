@@ -14,6 +14,7 @@ jobs:
     steps:
       - name: Checkout Repo A
         uses: actions/checkout@v4
+        with: fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -28,7 +29,8 @@ jobs:
       - name: Extract PR Diff
         run: |
           git fetch origin main
-          git diff origin/main...HEAD > pr.diff
+          git diff origin/main...HEAD^ > pr.diff
+          echo "PR diff length: $(wc -c < pr.diff)"
 
       - name: Generate AI Tests via Google Gemini
         env:
@@ -52,7 +54,7 @@ jobs:
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
             // Use a valid model from your API key
-            const model = genAI.getGenerativeModel({ model: "models/gemini-2.5-flash" });
+            const model = genAI.getGenerativeModel({ model: "models/text-bison-001" });
 
             const prompt = `
           You generate Playwright test cases based ONLY on the diff.
@@ -80,7 +82,7 @@ jobs:
 
       - name: Checkout Repo B
         run: |
-          git clone https://x-access-token:${{ secrets.AI_TEST_REPO_TOKEN }}@github.com/sarang-code2/ai-playwright-tests.git repo-b
+          git clone https://x-access-token:${{ secrets.REPO_B_TOKEN }}@github.com/sarang-code2/ai-playwright-tests.git repo-b
 
       - name: Copy generated tests into Repo B
         run: |
