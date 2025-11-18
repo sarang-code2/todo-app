@@ -30,7 +30,7 @@ jobs:
       - name: Extract PR Diff
         run: |
           git fetch origin main
-          git diff origin/main...HEAD^ > pr.diff
+          git diff HEAD~1..HEAD > pr.diff
           echo "PR diff length: $(wc -c < pr.diff)"
 
       - name: Generate AI Tests via Google Gemini
