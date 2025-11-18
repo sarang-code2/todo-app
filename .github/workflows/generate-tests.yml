@@ -15,44 +15,78 @@ jobs:
       - name: Checkout Repo A
         uses: actions/checkout@v4
 
-      - name: Install Ollama
-        run: |
-          curl -fsSL https://ollama.com/install.sh | sh
-          ollama --version
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-      - name: Pull open-source LLM
+      - name: Install Dependencies
         run: |
-          ollama pull mistral
+          npm init -y
+          npm install openai@4.0.0
 
-      - name: Extract PR diff
+      - name: Extract PR Diff
+        id: diff
         run: |
+          echo "Generating PR diff..."
           git fetch origin main
           git diff origin/main...HEAD > pr.diff
+          echo "Diff created"
 
-      - name: Prepare prompt
+      - name: Generate AI Tests via OpenAI
+        id: ai
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          mkdir -p generated-tests
+          echo "Calling OpenAI to generate tests..."
 
-          echo "Write Playwright test cases based ONLY on this PR diff." > prompt.txt
-          echo "Output ONLY valid .spec.ts file content." >> prompt.txt
-          echo "" >> prompt.txt
-          echo "PR DIFF BELOW:" >> prompt.txt
-          echo "" >> prompt.txt
+          NODE_CODE=$(cat << 'EOF'
+          import fs from 'fs';
+          import OpenAI from 'openai';
 
-          cat pr.diff >> prompt.txt
+          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-      - name: Generate tests using LLM
-        run: |
-          cat prompt.txt | ollama run mistral > generated-tests/ai-test.spec.ts
+          const diff = fs.readFileSync('pr.diff', 'utf8');
+
+          async function run() {
+            console.log("Sending diff to OpenAI...");
+
+            const response = await client.chat.completions.create({
+              model: "gpt-4o-mini",
+              messages: [
+                {
+                  role: "system",
+                  content: "You generate Playwright test cases based on code changes."
+                },
+                {
+                  role: "user",
+                  content: `Here is the PR diff:\n\n${diff}\n\nGenerate Playwright tests in TypeScript.`
+                }
+              ]
+            });
+
+            const testContent = response.choices[0].message.content;
+
+            fs.mkdirSync("generated-tests", { recursive: true });
+            fs.writeFileSync("generated-tests/ai-test.spec.ts", testContent);
+
+            console.log("AI test generated successfully.");
+          }
+
+          run();
+          EOF
+          )
+
+          node -e "$NODE_CODE"
 
       - name: Checkout Repo B
         run: |
           git clone https://x-access-token:${{ secrets.REPO_B_TOKEN }}@github.com/sarang-code2/ai-playwright-tests.git repo-b
 
-      - name: Copy generated tests to Repo B
+      - name: Copy generated tests into Repo B
         run: |
-          mkdir -p repo-b/tests/ai-generated/
-          cp generated-tests/*.spec.ts repo-b/tests/ai-generated/
+          mkdir -p repo-b/tests/ai-generated
+          cp generated-tests/*.ts repo-b/tests/ai-generated/
 
       - name: Commit & push tests to Repo B
         run: |
@@ -60,5 +94,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add .
-          git commit -m "AI-generated tests for PR #${{ github.event.pull_request.number }}" || echo "No changes"
+          git commit -m "AI-generated tests for PR #${{ github.event.pull_request.number }}" || echo "No changes to commit"
           git push
