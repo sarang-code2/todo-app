@@ -30,7 +30,7 @@ export default function TodoItem({
         {todo.text}
       </span>
 
-      <button onClick={() => onDelete(todo.id)}>Delete</button>
+      <button onClick={() => onDelete(todo.id)}>Delete Task</button>
     </div>
   );
 }
