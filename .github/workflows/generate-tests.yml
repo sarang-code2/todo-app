@@ -33,12 +33,12 @@ jobs:
           git diff origin/main...HEAD > pr.diff
           echo "Diff created"
 
-      - name: Generate AI Tests via Grok (xAI)
+      - name: Generate AI Tests via Google Gemini (FREE)
         id: ai
         env:
-          GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          echo "Calling Grok to generate tests..."
+          echo "Calling Gemini to generate tests..."
 
           NODE_CODE=$(cat << 'EOF'
           import fs from 'fs';
@@ -47,32 +47,30 @@ jobs:
           const diff = fs.readFileSync('pr.diff', 'utf8');
 
           async function run() {
-            console.log("Sending diff to Grok...");
+            console.log("Sending diff to Gemini...");
 
             const response = await axios.post(
-              "https://api.x.ai/v1/chat/completions",
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
               {
-                model: "grok-2-latest",
-                messages: [
-                  {
-                    role: "system",
-                    content: "You generate well-structured, stable Playwright test cases in TypeScript based on PR code diffs."
-                  },
+                contents: [
                   {
                     role: "user",
-                    content: `Here is the PR diff:\n\n${diff}\n\nGenerate Playwright test files only. No explanation — only raw code output.`
+                    parts: [
+                      {
+                        text: `Write Playwright test cases ONLY based on this PR diff. Output only valid .spec.ts code.\n\nPR DIFF:\n${diff}`
+                      }
+                    ]
                   }
                 ]
               },
               {
                 headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${process.env.GROK_API_KEY}`,
+                  "Content-Type": "application/json"
                 }
               }
             );
 
-            const testContent = response.data.choices[0].message.content;
+            const testContent = response.data.candidates[0].content.parts[0].text;
 
             fs.mkdirSync("generated-tests", { recursive: true });
             fs.writeFileSync("generated-tests/ai-test.spec.ts", testContent);
